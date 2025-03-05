@@ -1,0 +1,2 @@
+C:/Users/boompaye/hatka/android/app/.cxx/Debug/2l5g6p1w/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/boompaye/hatka/android/app/.cxx/Debug/2l5g6p1w/x86_64/CMakeFiles/rebuild_cache.dir

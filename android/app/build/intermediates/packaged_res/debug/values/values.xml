@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gcm_defaultSenderId" translatable="false">851186644664</string>
+    <string name="google_api_key" translatable="false">AIzaSyAS12OepNLqVdvIs8mquO6w5D9_BZPz9dY</string>
+    <string name="google_app_id" translatable="false">1:851186644664:android:2ace52ae6132467900e64d</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyAS12OepNLqVdvIs8mquO6w5D9_BZPz9dY</string>
+    <string name="google_storage_bucket" translatable="false">hatka-50258.firebasestorage.app</string>
+    <string name="project_id" translatable="false">hatka-50258</string>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
