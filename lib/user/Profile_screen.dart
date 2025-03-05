@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hatka/Screen/login_screen.dart';
+import 'package:hatka/user/My_Application.dart';
 import 'package:hatka/user/ProfileMain_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:hatka/user/Bookmark_screen.dart';
@@ -186,7 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => DetailScreen(title: 'My Application'),
+          builder: (context) => MyApplicationsScreen(),
         ),
       );
     } else if (screenName == 'Bookmark') {
