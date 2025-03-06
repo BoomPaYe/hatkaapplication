@@ -239,14 +239,25 @@ class _JobDetailScreenState extends State<JobDetailScreen>
   }
 
   void _navigateToApplicationScreen() {
-    // Navigate to application screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => JobApplicationForm(job: jobDetails ?? widget.job),
-      ),
-    );
-  }
+  // Ensure the job has both id and postId before navigation
+  final jobToPass = {
+    ...jobDetails ?? widget.job,
+    'id': widget.job['id'],
+    'postId': jobDetails?['id'] ?? widget.job['id'],  // Use post document ID as postId if missing
+    'userId': widget.job['userId'],       // Add this line
+    'companyId': widget.job['userId'],    // Add this line for compatibility
+  };
+  
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => JobApplicationForm(job: jobToPass),
+    ),
+  );
+  // print("Navigating to application with job: ${jobDetails ?? widget.job}");
+  print("Navigating to application with job: $jobToPass");
+
+}
 
   @override
   Widget build(BuildContext context) {

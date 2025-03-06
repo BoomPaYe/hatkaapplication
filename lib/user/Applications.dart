@@ -6,16 +6,36 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Job class
+// Job class with updated fields including location
 class Job {
   final String id;
   final String title;
   final String company;
+  final String companyId;
+  final String postId;
+  final String location;
 
   Job.fromMap(Map<String, dynamic> map)
       : id = map['id'] ?? '',
         title = map['title'] ?? 'Untitled Job',
-        company = map['name'] ?? map['company'] ?? 'Unknown Company';
+        company = map['name'] ?? 'Loading...',
+        companyId = map['userId'] ??
+            map['companyId'] ??
+            '', // Try both userId and companyId
+        postId = map['postId'] ?? map['id'] ?? '',
+        location = map['location'] ?? 'Remote';
+
+  // Method to create a new Job with updated company and location
+  Job copyWith({String? company, String? location}) {
+    return Job.fromMap({
+      'id': this.id,
+      'title': this.title,
+      'company': company ?? this.company,
+      'companyId': this.companyId,
+      'postId': this.postId,
+      'location': location ?? this.location,
+    });
+  }
 }
 
 // Job Application Form
@@ -37,13 +57,19 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
   final TextEditingController _additionalTextController =
       TextEditingController();
 
-  // File variable for resume
+  // File variables for resume and cover letter
   File? _resumeFile;
+
+  // Company name from users collection
+  String _companyName = 'Loading...';
+  String _jobLocation = 'Remote';
+  String? _companyProfileImageUrl;
 
   // New variable to track submission state
   bool _isSubmitting = false;
+  bool _isLoading = true;
 
-  // Cloudinary configuration - REPLACE WITH YOUR ACTUAL DETAILS
+  // Cloudinary configuration
   final String cloudinaryUrl =
       'https://api.cloudinary.com/v1_1/dbo1t0quj/upload';
   final String uploadPreset = 'pdfapplication';
@@ -56,9 +82,142 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
     // Convert the job map to a Job instance
     _jobInstance = Job.fromMap(widget.job);
 
-    // Optionally pre-fill additional text with job details
-    _additionalTextController.text =
-        'Application for ${_jobInstance.title} at ${_jobInstance.company}';
+    print("Job data received: ${widget.job}");
+    print("Company ID from job data: ${widget.job['companyId']}");
+    print("userId from job: ${widget.job['userId']}");
+    print(
+        "Job instance created: id=${_jobInstance.id}, postId=${_jobInstance.postId}, companyId=${_jobInstance.companyId}");
+
+    if (_jobInstance.id.isEmpty && _jobInstance.postId.isEmpty) {
+      // Show an error dialog or toast
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Invalid job data received. Please try again.')));
+        // Navigate back after a short delay
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pop();
+        });
+      });
+    }
+
+    // Fetch company name and profile image from users collection
+    _fetchCompanyData();
+
+    // Fetch job location from posts collection
+    _fetchJobLocation();
+
+    // Pre-fill email with current user's email if available
+    _prefillUserData();
+  }
+
+  Future<void> _fetchCompanyData() async {
+    try {
+      // Try both userId and companyId fields
+      String companyId = _jobInstance.companyId;
+
+      print("Job data received: ${widget.job}");
+      print("Company ID from job instance: $companyId");
+
+      if (companyId.isNotEmpty) {
+        final docSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(companyId)
+            .get();
+
+        print("Document exists: ${docSnapshot.exists}");
+        if (docSnapshot.exists) {
+          final data = docSnapshot.data();
+          print("Company data: $data");
+
+          setState(() {
+            _companyName = data?['name'] ?? 'Unknown Company';
+            _companyProfileImageUrl = data?['profileImage'];
+            _jobInstance = _jobInstance.copyWith(company: _companyName);
+            print("Updated company name: $_companyName");
+            print("Updated profile image: $_companyProfileImageUrl");
+          });
+        } else {
+          print("Company document not found");
+          setState(() {
+            _companyName = 'Unknown Company';
+          });
+        }
+      } else {
+        print("Company ID is empty");
+        setState(() {
+          _companyName = 'Unknown Company';
+        });
+      }
+    } catch (e) {
+      print('Error fetching company data: $e');
+      setState(() {
+        _companyName = 'Unknown Company';
+      });
+    }
+  }
+
+  Future<void> _fetchJobLocation() async {
+    try {
+      String postId = _jobInstance.postId.isNotEmpty
+          ? _jobInstance.postId
+          : _jobInstance.id;
+
+      if (postId.isNotEmpty) {
+        final postSnapshot = await FirebaseFirestore.instance
+            .collection('posts')
+            .doc(postId)
+            .get();
+
+        if (postSnapshot.exists) {
+          setState(() {
+            _jobLocation = postSnapshot.data()?['location'] ?? 'Remote';
+            // Update the job instance with the fetched location
+            _jobInstance = _jobInstance.copyWith(location: _jobLocation);
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching job location: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _prefillUserData() async {
+    // Get current user
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      // Set email from authentication
+      setState(() {
+        _emailController.text = currentUser.email ?? '';
+      });
+
+      // Try to get user's full name from Firestore
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            _fullNameController.text = userDoc.data()?['fullName'] ?? '';
+          });
+        }
+      } catch (e) {
+        print('Error fetching user profile: $e');
+      }
+    }
   }
 
   Future<String?> _uploadToCloudinary(File file) async {
@@ -104,25 +263,44 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
   }
 
   Future<void> _submitApplication() async {
-    // Check if user is authenticated
+    // Existing auth check
     User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (context) => ApplicationResultScreen(
-              isSuccess: false,
-              errorMessage: 'Please log in to submit an application')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please log in to submit an application')));
       return;
     }
 
-    // Check if already submitting to prevent multiple submissions
-    if (_isSubmitting) return;
-
     // Validate form
     if (!_formKey.currentState!.validate()) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (context) => ApplicationResultScreen(
-              isSuccess: false,
-              errorMessage: 'Please fill in all required fields correctly')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Please fill in all required fields correctly')));
+      return;
+    }
+
+    // Debug information
+    print(
+        "Job instance: ${_jobInstance.id}, postId: ${_jobInstance.postId}, companyId: ${_jobInstance.companyId}");
+
+    // Determine the best ID to use for the post reference
+    // Try postId first, then fall back to id if needed
+    String postId = '';
+    if (_jobInstance.postId.isNotEmpty) {
+      postId = _jobInstance.postId;
+    } else if (_jobInstance.id.isNotEmpty) {
+      postId = _jobInstance.id;
+    }
+
+    if (postId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Invalid job posting. Please try again later.')));
+      return;
+    }
+
+    // Check if resume is uploaded
+    if (_resumeFile == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Please upload your resume')));
       return;
     }
 
@@ -132,17 +310,18 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
 
     try {
       // Upload resume to Cloudinary
-      String? resumeUrl;
-      if (_resumeFile != null) {
-        resumeUrl = await _uploadToCloudinary(_resumeFile!);
+      String? resumeUrl = await _uploadToCloudinary(_resumeFile!);
 
-        if (resumeUrl == null) {
-          Navigator.of(context).pushReplacement(MaterialPageRoute(
-              builder: (context) => ApplicationResultScreen(
-                  isSuccess: false, errorMessage: 'Failed to upload resume')));
-          return;
-        }
+      if (resumeUrl == null) {
+        throw Exception('Failed to upload resume');
       }
+
+      // Get post reference from posts collection
+      DocumentReference postRef =
+          FirebaseFirestore.instance.collection('posts').doc(postId);
+
+      // Print for debugging
+      print("Submitting application with postId: $postId");
 
       // Submit to user's jobApplications subcollection
       await FirebaseFirestore.instance
@@ -150,26 +329,51 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
           .doc(currentUser.uid)
           .collection('jobApplications')
           .add({
-        'jobId': _jobInstance.id,
         'jobTitle': _jobInstance.title,
-        'Company': _jobInstance.company,
+        'company': _companyName,
+        'companyImageUrl': _companyProfileImageUrl,
+        'location': _jobLocation,
+        'postId': postId,
+        'applicantId': currentUser.uid,
+        'postRef': postRef,
         'fullName': _fullNameController.text,
         'email': _emailController.text,
         'additionalText': _additionalTextController.text,
         'resumeUrl': resumeUrl,
         'submittedAt': FieldValue.serverTimestamp(),
-        'status': 'pending', // Optional: add a status field
+        'status': 'pending',
       });
+
+      // Add application to company's applications subcollection
+      // if (_jobInstance.companyId.isNotEmpty) {
+      //   await FirebaseFirestore.instance
+      //       .collection('users')
+      //       .doc(_jobInstance.companyId)
+      //       .collection('applications')
+      //       .add({
+      //     'jobTitle': _jobInstance.title,
+      //     'location': _jobLocation,
+      //     'postId': postId,
+      //     'postRef': postRef,
+      //     'applicantId': currentUser.uid,
+      //     'applicantName': _fullNameController.text,
+      //     'applicantEmail': _emailController.text,
+      //     'additionalText': _additionalTextController.text,
+      //     'resumeUrl': resumeUrl,
+      //     'submittedAt': FieldValue.serverTimestamp(),
+      //     'status': 'pending',
+      //   });
+      // }
 
       // Navigate to success screen
       Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (context) => ApplicationResultScreen(isSuccess: true)));
     } catch (e) {
-      // Navigate to failure screen with error message
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (context) => ApplicationResultScreen(
-              isSuccess: false, errorMessage: e.toString())));
-    } finally {
+      print('Error submitting application: $e');
+      // Show error in snackbar
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+
       setState(() {
         _isSubmitting = false;
       });
@@ -180,84 +384,284 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Apply for ${_jobInstance.title}'),
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Applying for: ${_jobInstance.title}',
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                'Company: ${_jobInstance.company}',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _fullNameController,
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your full name';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  // Basic email validation
-                  final emailRegex =
-                      RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                  if (!emailRegex.hasMatch(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _pickResume,
-                child: Text('Upload Resume'),
-              ),
-              if (_resumeFile != null)
-                Text('Resume Selected: ${_resumeFile!.path.split('/').last}'),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _additionalTextController,
-                decoration: InputDecoration(
-                  labelText: 'Additional Information',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 4,
-              ),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _submitApplication,
-                child: Text('Submit Application'),
-              ),
-            ],
-          ),
+        title: Text('Apply for Job'),
+        leading: IconButton(
+          icon: Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
         ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
       ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Job details with company logo
+                      Card(
+                        elevation: 2,
+                        margin: EdgeInsets.only(bottom: 20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Company Profile Image
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.grey[200],
+                                  image: _companyProfileImageUrl != null
+                                      ? DecorationImage(
+                                          image: NetworkImage(
+                                              _companyProfileImageUrl!),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                ),
+                                child: _companyProfileImageUrl == null
+                                    ? Icon(Icons.business,
+                                        size: 30, color: Colors.grey[500])
+                                    : null,
+                              ),
+                              SizedBox(width: 16),
+                              // Job details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _jobInstance.title,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      _companyName,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on,
+                                            size: 16, color: Colors.grey[600]),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          _jobLocation,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Full Name Field
+                      Text(
+                        'Full Name',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      TextFormField(
+                        controller: _fullNameController,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your full name';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 20),
+
+                      // Email Field
+                      Text(
+                        'Email',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your email';
+                          }
+                          // Basic email validation
+                          final emailRegex =
+                              RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                          if (!emailRegex.hasMatch(value)) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 20),
+
+                      // Resume Upload Section
+                      Text(
+                        'Upload Resume and Cover Letter',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Be sure to include an updated resume',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      InkWell(
+                        onTap: _pickResume,
+                        child: Container(
+                          width: double.infinity,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.attach_file,
+                                size: 32,
+                                color: Colors.blue,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                _resumeFile != null
+                                    ? _resumeFile!.path.split('/').last
+                                    : 'Upload Resume and Cover Letter',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+
+                      // Additional Text Field
+                      Text(
+                        'Add text',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      TextFormField(
+                        controller: _additionalTextController,
+                        decoration: InputDecoration(
+                          hintText: 'Write something here...',
+                          contentPadding: EdgeInsets.all(16),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                        maxLines: 8,
+                      ),
+                      SizedBox(height: 32),
+
+                      // Submit Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _submitApplication,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: _isSubmitting
+                              ? CircularProgressIndicator(color: Colors.white)
+                              : Text(
+                                  'Submit',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
@@ -267,9 +671,11 @@ class ApplicationResultScreen extends StatelessWidget {
   final bool isSuccess;
   final String? errorMessage;
 
-  const ApplicationResultScreen(
-      {Key? key, required this.isSuccess, this.errorMessage})
-      : super(key: key);
+  const ApplicationResultScreen({
+    Key? key,
+    required this.isSuccess,
+    this.errorMessage,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -321,11 +727,10 @@ class ApplicationResultScreen extends StatelessWidget {
                 onPressed: () {
                   // Navigate to My Applications or dismiss
                   if (isSuccess) {
-                    // Replace with your actual navigation to applications page
                     Navigator.of(context).pushNamedAndRemoveUntil(
                         '/my-applications', (route) => false);
                   } else {
-                    // Typically, just pop back to previous screen
+                    // Just pop back to previous screen
                     Navigator.of(context).pop();
                   }
                 },
@@ -344,7 +749,7 @@ class ApplicationResultScreen extends StatelessWidget {
                   // Always allow cancelling/going back
                   Navigator.of(context).pop();
                 },
-                child: Text('Back to user'),
+                child: Text('Back to Main Page'),
               ),
             ],
           ),

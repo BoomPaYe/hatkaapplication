@@ -13,12 +13,34 @@ class MyApplicationsScreen extends StatefulWidget {
 class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _applications = [];
+  String? _profileImageUrl;
   final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-  
+
   @override
   void initState() {
     super.initState();
     _fetchApplications();
+    _fetchUserProfile();
+  }
+
+  Future<void> _fetchUserProfile() async {
+    if (_currentUserId.isEmpty) return;
+
+    try {
+      // Fetch user profile data to get the profile image
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
+
+      if (mounted && userDoc.exists) {
+        setState(() {
+          _profileImageUrl = userDoc.data()?['profileImageUrl'];
+        });
+      }
+    } catch (e) {
+      print('Error fetching user profile: $e');
+    }
   }
 
   Future<void> _fetchApplications() async {
@@ -38,7 +60,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return;
       }
 
-      // Fetch applications from Firestore
+      // Fetch applications directly from jobApplications collection
       final applicationsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(_currentUserId)
@@ -87,6 +109,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         title: const Text('My Applications'),
         centerTitle: true,
         actions: [
+          _buildProfileAvatar(),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchApplications,
@@ -103,13 +126,35 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: _applications.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final application = _applications[index];
                       return _buildApplicationCard(application);
                     },
                   ),
                 ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: GestureDetector(
+        onTap: () {
+          // Navigate to profile page
+          Navigator.pushNamed(context, '/profile');
+        },
+        child: CircleAvatar(
+          radius: 16,
+          backgroundColor: Colors.grey[200],
+          backgroundImage:
+              _profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null,
+          child: _profileImageUrl == null
+              ? Icon(Icons.person, size: 20, color: Colors.grey[600])
+              : null,
+        ),
+      ),
     );
   }
 
@@ -187,7 +232,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          application['Company']?.toString() ?? 'Company',
+                          application['company']?.toString() ?? 'Company',
                           style: const TextStyle(
                             fontSize: 14,
                           ),
@@ -195,7 +240,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                       ],
                     ),
                   ),
-                  _buildStatusChip('Applied', Colors.green),
+                  _buildStatusChip(application['status'] ?? 'Applied',
+                      _getStatusColor(application['status'])),
                 ],
               ),
               const SizedBox(height: 12),
@@ -203,15 +249,17 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildDetailChip('Full-Time', Colors.blue),
-                  _buildDetailChip('On-site', Colors.purple),
+                  if (application['jobType'] != null)
+                    _buildDetailChip(application['jobType'], Colors.blue),
+                  if (application['locationType'] != null)
+                    _buildDetailChip(
+                        application['locationType'], Colors.purple),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // You can add more details here if needed
                   Text(
                     _formatDate(application['submittedAt']),
                     style: TextStyle(
@@ -229,26 +277,48 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildCompanyLogo(Map<String, dynamic> application) {
-    final String companyName = application['Company']?.toString() ?? 'Company';
-    final String initial = companyName.isNotEmpty ? companyName[0].toUpperCase() : 'C';
-    
+    final String companyName = application['company']?.toString() ?? 'Company';
+    final String? companyLogo = application['companyImageUrl']?.toString();
+    final String initial =
+        companyName.isNotEmpty ? companyName[0].toUpperCase() : 'C';
+
     return Container(
       width: 50,
       height: 50,
       decoration: BoxDecoration(
-        color: _getCompanyColor(companyName),
+        color: companyLogo == null ? _getCompanyColor(companyName) : null,
         borderRadius: BorderRadius.circular(25),
       ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      child: companyLogo != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: Image.network(
+                companyLogo,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          : Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
     );
   }
 
@@ -261,6 +331,21 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         return Colors.orange;
       default:
         return Colors.blue;
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'applied':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'interview':
+        return Colors.deepOrange;
+      case 'offer':
+        return Colors.purple;
+      default:
+        return Colors.orange;
     }
   }
 
@@ -307,6 +392,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
     if (timestamp is Timestamp) {
       return 'Applied ${timeago.format(timestamp.toDate())}';
+    } else if (timestamp is String) {
+      // Handle string dates
+      return 'Applied on $timestamp';
     }
     return '';
   }
