@@ -355,32 +355,35 @@ Future<void> _submitApplication() async {
 
     // Add application to company's applications subcollection
     if (companyId.isNotEmpty) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(companyId)
-          .collection('applications')
-          .add({
-        'jobTitle': _jobInstance.title,
-        'location': _jobLocation,
-        'postId': postId,
-        'postRef': postRef,
-        'applicantId': currentUser.uid,
-        'applicantName': _fullNameController.text,
-        'applicantEmail': _emailController.text,
-        'additionalText': _additionalTextController.text,
-        'resumeUrl': resumeUrl,
-        'submittedAt': FieldValue.serverTimestamp(),
-        'status': 'pending',
-      });
-
-      // Get applicant details
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+  // Get applicant profile image from user document
+  final userDoc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(currentUser.uid)
+      .get();
+  
+  String? applicantProfileImage = userDoc.data()?['profileImage'];
+  
+  await FirebaseFirestore.instance
+      .collection('users')
+      .doc(companyId)
+      .collection('applications')
+      .add({
+    'jobTitle': _jobInstance.title,
+    'location': _jobLocation,
+    'postId': postId,
+    'postRef': postRef,
+    'applicantId': currentUser.uid,
+    'applicantName': _fullNameController.text,
+    'applicantEmail': _emailController.text,
+    'additionalText': _additionalTextController.text,
+    'resumeUrl': resumeUrl,
+    'submittedAt': FieldValue.serverTimestamp(),
+    'status': 'pending',
+    'profileImage': applicantProfileImage, // Added profile image field
+  });
       
       String applicantName = _fullNameController.text;
-      String? applicantProfileImage = userDoc.data()?['profileImage'];
+      // String? applicantProfileImage = userDoc.data()?['profileImage'];
 
       // Send notification to company
       await NotificationService().sendNotificationToUser(

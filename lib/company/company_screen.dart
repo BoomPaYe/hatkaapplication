@@ -30,6 +30,7 @@ class _CompanyScreenState extends State<CompanyScreen> {
         CompanyMainScreen(),
         CreatePostScreen(),
         ApplicantScreen(),
+
         ProfileScreen(),
       ],
     );
@@ -50,10 +51,11 @@ class _CompanyScreenState extends State<CompanyScreen> {
       unselectedItemColor: Colors.grey,
       items: [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.create_new_folder), label: "Create"),
+        BottomNavigationBarItem(icon: Icon(Icons.create), label: "Create"),
         BottomNavigationBarItem(
             icon: Icon(Icons.document_scanner_outlined), label: "Applicants"),
+        // BottomNavigationBarItem(
+        //     icon: Icon(Icons.notifications), label: "Notifications"),
         BottomNavigationBarItem(icon: Icon(Icons.people), label: "Profile"),
       ],
     );

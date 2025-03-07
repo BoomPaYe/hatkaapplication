@@ -62,7 +62,7 @@ class _UserMainScreenState extends State<UserMainScreen> {
     );
   }
 
-  Widget _buildHeader() {
+Widget _buildHeader() {
   final User? currentUser = FirebaseAuth.instance.currentUser;
   
   return Row(
@@ -76,61 +76,71 @@ class _UserMainScreenState extends State<UserMainScreen> {
           color: Colors.blue,
         ),
       ),
-      StreamBuilder<QuerySnapshot>(
-        stream: currentUser != null
-            ? FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .collection('notifications')
-                .where('isRead', isEqualTo: false)
-                .snapshots()
-            : null,
-        builder: (context, snapshot) {
-          int unreadCount = 0;
-          if (snapshot.hasData && snapshot.data != null) {
-            unreadCount = snapshot.data!.docs.length;
-          }
-          
-          return Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => NotificationsScreen()),
-                  );
-                },
-              ),
-              if (unreadCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
+      currentUser == null 
+          ? IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {
+                // Perhaps show a login prompt or just navigate to notifications
+                // which will show "Please log in to view notifications"
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => NotificationsScreen()),
+                );
+              },
+            )
+          : StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .collection('notifications')
+                  .where('isRead', isEqualTo: false)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                int unreadCount = 0;
+                if (snapshot.hasData && snapshot.data != null) {
+                  unreadCount = snapshot.data!.docs.length;
+                }
+                
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => NotificationsScreen()),
+                        );
+                      },
                     ),
-                    constraints: BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      unreadCount > 9 ? '9+' : unreadCount.toString(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 9 ? '9+' : unreadCount.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
+                  ],
+                );
+              },
+            ),
     ],
   );
 }

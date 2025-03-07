@@ -86,10 +86,12 @@ class _CompanyMainScreenState extends State<CompanyMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
     final userId = _auth.currentUser?.uid;
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text("My Job Posts"),
         actions: [
           // Optional: Add a refresh button
