@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hatka/user/Applications.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hatka/Screen/login_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -22,21 +23,28 @@ class _JobDetailScreenState extends State<JobDetailScreen>
   String currentUserId = '';
   bool isBookmarkProcessing = false;
   bool isJobActive = true; // Default to true until we know otherwise
+  bool isUserLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
     // Register this as an observer to detect app lifecycle changes
     WidgetsBinding.instance.addObserver(this);
-    currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    
+    // Check if user is logged in
+    final currentUser = FirebaseAuth.instance.currentUser;
+    isUserLoggedIn = currentUser != null;
+    currentUserId = currentUser?.uid ?? '';
 
     // Initial data fetch
     _fetchData();
 
-    // Check bookmark status after frame is rendered
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkIfBookmarked();
-    });
+    // Check bookmark status after frame is rendered (only if user is logged in)
+    if (isUserLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkIfBookmarked();
+      });
+    }
   }
 
   @override
@@ -48,9 +56,22 @@ class _JobDetailScreenState extends State<JobDetailScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When app resumes, refresh bookmark status
-    if (state == AppLifecycleState.resumed) {
+    // When app resumes, refresh bookmark status (only if user is logged in)
+    if (state == AppLifecycleState.resumed && isUserLoggedIn) {
       _checkIfBookmarked();
+      
+      // Also check if login status has changed
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if ((currentUser != null) != isUserLoggedIn) {
+        setState(() {
+          isUserLoggedIn = currentUser != null;
+          currentUserId = currentUser?.uid ?? '';
+        });
+        
+        if (isUserLoggedIn) {
+          _checkIfBookmarked();
+        }
+      }
     }
   }
 
@@ -58,21 +79,25 @@ class _JobDetailScreenState extends State<JobDetailScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _checkIfBookmarked();
+    if (isUserLoggedIn) {
+      _checkIfBookmarked();
+    }
   }
 
   // This is called when the widget is inserted back into the tree
   @override
   void activate() {
     super.activate();
-    _checkIfBookmarked();
+    if (isUserLoggedIn) {
+      _checkIfBookmarked();
+    }
   }
 
   @override
   void didUpdateWidget(JobDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     // If the job details changed, refresh bookmark status
-    if (oldWidget.job['id'] != widget.job['id']) {
+    if (oldWidget.job['id'] != widget.job['id'] && isUserLoggedIn) {
       _checkIfBookmarked();
     }
   }
@@ -101,8 +126,10 @@ class _JobDetailScreenState extends State<JobDetailScreen>
         });
       }
 
-      // Check bookmark status now that we have job details
-      _checkIfBookmarked();
+      // Check bookmark status now that we have job details (only if user is logged in)
+      if (isUserLoggedIn) {
+        _checkIfBookmarked();
+      }
     } catch (e) {
       print('Error fetching details: $e');
       if (mounted) {
@@ -115,7 +142,7 @@ class _JobDetailScreenState extends State<JobDetailScreen>
 
   Future<void> _checkIfBookmarked() async {
     try {
-      if (currentUserId.isEmpty || !mounted) return;
+      if (currentUserId.isEmpty || !mounted || !isUserLoggedIn) return;
 
       // Force a real-time check from Firestore to get the latest status
       final bookmarkDoc = await FirebaseFirestore.instance
@@ -137,7 +164,7 @@ class _JobDetailScreenState extends State<JobDetailScreen>
 
   // Add a listener for bookmark changes
   void _setupBookmarkListener() {
-    if (currentUserId.isEmpty) return;
+    if (currentUserId.isEmpty || !isUserLoggedIn) return;
 
     FirebaseFirestore.instance
         .collection('users')
@@ -155,20 +182,16 @@ class _JobDetailScreenState extends State<JobDetailScreen>
   }
 
   Future<void> _toggleBookmark() async {
+    // Check if user is logged in
+    if (!isUserLoggedIn) {
+      _showLoginRequiredDialog('bookmark jobs');
+      return;
+    }
+
     // Prevent multiple clicks by checking if an operation is already in progress
     if (isBookmarkProcessing) return;
 
     try {
-      if (currentUserId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please log in to bookmark jobs'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
       // Set processing flag to prevent UI interactions
       setState(() {
         isBookmarkProcessing = true;
@@ -239,32 +262,68 @@ class _JobDetailScreenState extends State<JobDetailScreen>
   }
 
   void _navigateToApplicationScreen() {
-  // Ensure the job has both id and postId before navigation
-  final jobToPass = {
-    ...jobDetails ?? widget.job,
-    'id': widget.job['id'],
-    'postId': jobDetails?['id'] ?? widget.job['id'],  // Use post document ID as postId if missing
-    'userId': widget.job['userId'],       // Add this line
-    'companyId': widget.job['userId'],    // Add this line for compatibility
-  };
-  
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => JobApplicationForm(job: jobToPass),
-    ),
-  );
-  // print("Navigating to application with job: ${jobDetails ?? widget.job}");
-  print("Navigating to application with job: $jobToPass");
+    // Check if user is logged in
+    if (!isUserLoggedIn) {
+      _showLoginRequiredDialog('apply to jobs');
+      return;
+    }
+    
+    // Ensure the job has both id and postId before navigation
+    final jobToPass = {
+      ...jobDetails ?? widget.job,
+      'id': widget.job['id'],
+      'postId': jobDetails?['id'] ?? widget.job['id'],  // Use post document ID as postId if missing
+      'userId': widget.job['userId'],       // Add this line
+      'companyId': widget.job['userId'],    // Add this line for compatibility
+    };
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobApplicationForm(job: jobToPass),
+      ),
+    );
+    print("Navigating to application with job: $jobToPass");
+  }
 
-}
+  void _showLoginRequiredDialog(String action) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Login Required'),
+          content: Text('You need to login first to $action.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => LoginScreen()), // Navigate to login screen
+                );
+              },
+              child: const Text('Login'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Setup bookmark listener on first build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupBookmarkListener();
-    });
+    // Setup bookmark listener on first build (only if user is logged in)
+    if (isUserLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _setupBookmarkListener();
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -556,7 +615,6 @@ class _JobDetailScreenState extends State<JobDetailScreen>
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
-          // Disable the button if the job is not active
           onPressed: isJobActive ? _navigateToApplicationScreen : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: isJobActive ? Colors.blue : Colors.grey.shade300,
@@ -567,7 +625,9 @@ class _JobDetailScreenState extends State<JobDetailScreen>
             ),
           ),
           child: Text(
-            isJobActive ? 'Apply Now' : 'Position No Longer Available',
+            isJobActive 
+                ? (isUserLoggedIn ? 'Apply Now' : 'Login to Apply')
+                : 'Position No Longer Available',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -660,5 +720,3 @@ class _JobDetailScreenState extends State<JobDetailScreen>
     return '';
   }
 }
-
-// Placeholder for the Application Screen

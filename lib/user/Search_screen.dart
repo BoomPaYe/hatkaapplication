@@ -100,7 +100,8 @@ class _InternshipSearchScreenState extends State<InternshipSearchScreen> {
   }
 
   // Helper method to filter only active internships
-  List<DocumentSnapshot> _filterActiveInternships(List<DocumentSnapshot> internships) {
+  List<DocumentSnapshot> _filterActiveInternships(
+      List<DocumentSnapshot> internships) {
     return internships.where((doc) {
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       return data['isActive'] == true;
@@ -125,7 +126,7 @@ class _InternshipSearchScreenState extends State<InternshipSearchScreen> {
               .collection('users')
               .doc(userId)
               .get();
-          
+
           if (userDoc.exists) {
             _userData[userId] = userDoc.data() as Map<String, dynamic>;
           }
@@ -144,64 +145,65 @@ class _InternshipSearchScreenState extends State<InternshipSearchScreen> {
   }
 
   void _handleSearch(String value) {
-  setState(() {
-    _isSearching = value.isNotEmpty; // Set to true when searching
-    
-    // When searching, use all internships
-    // When not searching, filter to active only
-    _filteredInternships = _isSearching 
-        ? _internships.where((internship) {
-            Map<String, dynamic> data = internship.data() as Map<String, dynamic>;
-            return (data['title'] ?? '')
+    setState(() {
+      _isSearching = value.isNotEmpty; // Set to true when searching
+
+      // When searching, use all internships
+      // When not searching, filter to active only
+      _filteredInternships = _isSearching
+          ? _internships.where((internship) {
+              Map<String, dynamic> data =
+                  internship.data() as Map<String, dynamic>;
+              return (data['title'] ?? '')
+                  .toString()
+                  .toLowerCase()
+                  .contains(value.toLowerCase());
+            }).toList()
+          : _filterActiveInternships(_internships);
+
+      // Apply other filters
+      _applyFilters();
+    });
+  }
+
+  void _applyFilters() {
+    setState(() {
+      // Choose the appropriate base list based on whether user is searching
+      List<DocumentSnapshot> baseList =
+          _isSearching ? _internships : _filterActiveInternships(_internships);
+
+      _filteredInternships = baseList.where((internship) {
+        Map<String, dynamic> data = internship.data() as Map<String, dynamic>;
+
+        // Apply location filter
+        bool locationMatch = _selectedLocations.isEmpty ||
+            (_selectedLocations
+                .contains(data['location']?.toString().toLowerCase() ?? ''));
+
+        // Apply job type filter
+        bool jobTypeMatch = _selectedJobTypes.isEmpty ||
+            (_selectedJobTypes.contains(
+                data['internshipType']?.toString().toLowerCase() ?? ''));
+
+        // Apply industry/category filter
+        bool industryMatch = _selectedIndustries.isEmpty ||
+            (_selectedIndustries
+                .contains(data['category']?.toString().toLowerCase() ?? ''));
+
+        // Apply search text if searching
+        bool searchMatch = !_isSearching ||
+            _searchController.text.isEmpty ||
+            (data['title'] ?? '')
                 .toString()
                 .toLowerCase()
-                .contains(value.toLowerCase());
-          }).toList() 
-        : _filterActiveInternships(_internships);
-        
-    // Apply other filters
-    _applyFilters();
-  });
-}
+                .contains(_searchController.text.toLowerCase());
 
-void _applyFilters() {
-  setState(() {
-    // Choose the appropriate base list based on whether user is searching
-    List<DocumentSnapshot> baseList = _isSearching 
-        ? _internships 
-        : _filterActiveInternships(_internships);
-    
-    _filteredInternships = baseList.where((internship) {
-      Map<String, dynamic> data = internship.data() as Map<String, dynamic>;
+        return locationMatch && jobTypeMatch && industryMatch && searchMatch;
+      }).toList();
 
-      // Apply location filter
-      bool locationMatch = _selectedLocations.isEmpty ||
-          (_selectedLocations
-              .contains(data['location']?.toString().toLowerCase() ?? ''));
-
-      // Apply job type filter
-      bool jobTypeMatch = _selectedJobTypes.isEmpty ||
-          (_selectedJobTypes.contains(
-              data['internshipType']?.toString().toLowerCase() ?? ''));
-
-      // Apply industry/category filter
-      bool industryMatch = _selectedIndustries.isEmpty ||
-          (_selectedIndustries
-              .contains(data['category']?.toString().toLowerCase() ?? ''));
-
-      // Apply search text if searching
-      bool searchMatch = !_isSearching || _searchController.text.isEmpty ||
-          (data['title'] ?? '')
-              .toString()
-              .toLowerCase()
-              .contains(_searchController.text.toLowerCase());
-
-      return locationMatch && jobTypeMatch && industryMatch && searchMatch;
-    }).toList();
-
-    _showFilters = false;
-  });
-}
+      _showFilters = false;
+    });
+  }
 
   void _resetFilters() {
     setState(() {
@@ -210,7 +212,7 @@ void _applyFilters() {
       _selectedIndustries = {};
       _searchController.clear();
       _isSearching = false;
-      
+
       // If not searching, only show active internships
       _filteredInternships = _filterActiveInternships(_internships);
       _showFilters = false;
@@ -341,13 +343,13 @@ void _applyFilters() {
                         DocumentSnapshot doc = _filteredInternships[index];
                         Map<String, dynamic> data =
                             doc.data() as Map<String, dynamic>;
-                        
+
                         // Add the document ID to the data map
                         Map<String, dynamic> jobWithId = {
                           ...data,
                           'id': doc.id,
                         };
-                        
+
                         return _buildInternshipCard(jobWithId);
                       },
                     ),
@@ -408,7 +410,7 @@ void _applyFilters() {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: Colors.lightBlue,
                           ),
                         ),
                         Text(
@@ -543,205 +545,208 @@ void _applyFilters() {
     );
   }
 
- Widget _buildFiltersScreen() {
-  return Stack(
-    children: [
-      // Make this part scrollable
-      SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFiltersScreen() {
+    return Stack(
+      children: [
+        // Make this part scrollable
+        SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _showFilters = false;
+                        });
+                      },
+                    ),
+                    const Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 40), // For balance
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Filter by:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Locations',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _locationOptions.map((location) {
+                    bool isSelected =
+                        _selectedLocations.contains(location.toLowerCase());
+                    return FilterChip(
+                      label: Text(location),
+                      selected: isSelected,
+                      backgroundColor: Colors.white,
+                      selectedColor: Colors.blue.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color:
+                              isSelected ? Colors.blue : Colors.grey.shade300,
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedLocations.add(location.toLowerCase());
+                          } else {
+                            _selectedLocations.remove(location.toLowerCase());
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Job types',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _jobTypeOptions.map((jobType) {
+                    bool isSelected =
+                        _selectedJobTypes.contains(jobType.toLowerCase());
+                    return FilterChip(
+                      label: Text(jobType),
+                      selected: isSelected,
+                      backgroundColor: Colors.white,
+                      selectedColor: Colors.blue.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color:
+                              isSelected ? Colors.blue : Colors.grey.shade300,
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedJobTypes.add(jobType.toLowerCase());
+                          } else {
+                            _selectedJobTypes.remove(jobType.toLowerCase());
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Industries',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _industryOptions.map((industry) {
+                    bool isSelected =
+                        _selectedIndustries.contains(industry.toLowerCase());
+                    return FilterChip(
+                      label: Text(industry),
+                      selected: isSelected,
+                      backgroundColor: Colors.white,
+                      selectedColor: Colors.blue.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color:
+                              isSelected ? Colors.blue : Colors.grey.shade300,
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedIndustries.add(industry.toLowerCase());
+                          } else {
+                            _selectedIndustries.remove(industry.toLowerCase());
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                // Add padding at the bottom to ensure space for the buttons
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        ),
+        // Keep the buttons fixed at the bottom
+        Positioned(
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      setState(() {
-                        _showFilters = false;
-                      });
-                    },
-                  ),
-                  const Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _resetFilters,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.blue),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  const SizedBox(width: 40), // For balance
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Filter by:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  child: const Text('Reset Filter'),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Locations',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _locationOptions.map((location) {
-                  bool isSelected =
-                      _selectedLocations.contains(location.toLowerCase());
-                  return FilterChip(
-                    label: Text(location),
-                    selected: isSelected,
-                    backgroundColor: Colors.white,
-                    selectedColor: Colors.blue.withOpacity(0.1),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _applyFilters,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: Colors.blue,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: isSelected ? Colors.blue : Colors.grey.shade300,
-                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedLocations.add(location.toLowerCase());
-                        } else {
-                          _selectedLocations.remove(location.toLowerCase());
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Job types',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w500,
+                  ),
+                  child: const Text('Apply'),
                 ),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _jobTypeOptions.map((jobType) {
-                  bool isSelected =
-                      _selectedJobTypes.contains(jobType.toLowerCase());
-                  return FilterChip(
-                    label: Text(jobType),
-                    selected: isSelected,
-                    backgroundColor: Colors.white,
-                    selectedColor: Colors.blue.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: isSelected ? Colors.blue : Colors.grey.shade300,
-                      ),
-                    ),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedJobTypes.add(jobType.toLowerCase());
-                        } else {
-                          _selectedJobTypes.remove(jobType.toLowerCase());
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Industries',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _industryOptions.map((industry) {
-                  bool isSelected =
-                      _selectedIndustries.contains(industry.toLowerCase());
-                  return FilterChip(
-                    label: Text(industry),
-                    selected: isSelected,
-                    backgroundColor: Colors.white,
-                    selectedColor: Colors.blue.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: isSelected ? Colors.blue : Colors.grey.shade300,
-                      ),
-                    ),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedIndustries.add(industry.toLowerCase());
-                        } else {
-                          _selectedIndustries.remove(industry.toLowerCase());
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-              // Add padding at the bottom to ensure space for the buttons
-              const SizedBox(height: 80),
             ],
           ),
         ),
-      ),
-      // Keep the buttons fixed at the bottom
-      Positioned(
-        bottom: 16,
-        left: 16,
-        right: 16,
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _resetFilters,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: BorderSide(color: Colors.blue),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Reset Filter'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _applyFilters,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Apply'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   @override
   void dispose() {

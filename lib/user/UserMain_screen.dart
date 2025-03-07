@@ -1,11 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hatka/user/Category_screen.dart';
+import 'package:hatka/user/Notifications_screen.dart';
 import 'package:hatka/user/job_card.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'See_all_screen.dart';
 
 class UserMainScreen extends StatefulWidget {
+
   @override
   _UserMainScreenState createState() => _UserMainScreenState();
 }
@@ -60,24 +63,77 @@ class _UserMainScreenState extends State<UserMainScreen> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          'Find Your Internships',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue,
-          ),
+  final User? currentUser = FirebaseAuth.instance.currentUser;
+  
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      const Text(
+        'Find Your Internships',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue,
         ),
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          onPressed: () {},
-        ),
-      ],
-    );
-  }
+      ),
+      StreamBuilder<QuerySnapshot>(
+        stream: currentUser != null
+            ? FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .collection('notifications')
+                .where('isRead', isEqualTo: false)
+                .snapshots()
+            : null,
+        builder: (context, snapshot) {
+          int unreadCount = 0;
+          if (snapshot.hasData && snapshot.data != null) {
+            unreadCount = snapshot.data!.docs.length;
+          }
+          
+          return Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => NotificationsScreen()),
+                  );
+                },
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : unreadCount.toString(),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    ],
+  );
+}
 
   Widget _buildCategories() {
     return GridView.builder(

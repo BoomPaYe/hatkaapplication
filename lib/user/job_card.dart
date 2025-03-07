@@ -9,8 +9,8 @@ class JobCard extends StatefulWidget {
   final bool showOnlyActive;
 
   const JobCard({
-    Key? key, 
-    required this.job, 
+    Key? key,
+    required this.job,
     this.showOnlyActive = true, // Default to showing only active jobs
   }) : super(key: key);
 
@@ -28,7 +28,7 @@ class _JobCardState extends State<JobCard> {
   @override
   void initState() {
     super.initState();
-    
+
     // Check if activeStatus is already provided in the job data
     if (widget.job.containsKey('activeStatus')) {
       setState(() {
@@ -46,7 +46,7 @@ class _JobCardState extends State<JobCard> {
       // Fetch status if not provided
       _fetchPostStatus();
     }
-    
+
     _fetchUserDetails(widget.job['userId'] ?? '');
   }
 
@@ -58,12 +58,12 @@ class _JobCardState extends State<JobCard> {
         });
         return;
       }
-      
+
       final postDoc = await FirebaseFirestore.instance
           .collection('posts')
           .doc(widget.job['id'])
           .get();
-          
+
       if (postDoc.exists && mounted) {
         final postData = postDoc.data();
         if (postData != null && postData.containsKey('isActive')) {
@@ -190,7 +190,7 @@ class _JobCardState extends State<JobCard> {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: Colors.lightBlue,
                           ),
                         ),
                         Text(

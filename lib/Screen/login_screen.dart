@@ -105,7 +105,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
                       return null;
@@ -126,8 +127,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           });
                         },
                         icon: Icon(
-                          isPasswordHidden 
-                              ? Icons.visibility_off 
+                          isPasswordHidden
+                              ? Icons.visibility_off
                               : Icons.visibility,
                         ),
                       ),
@@ -148,11 +149,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: TextButton(
                       onPressed: () {
                         // Add forgot password functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Forgot password functionality will be added soon'))
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text(
+                                'Forgot password functionality will be added soon')));
                       },
                       child: const Text('Forgot your password?'),
+                      style: TextButton.styleFrom(
+                        foregroundColor:
+                            Colors.lightBlue, // Set text color to light blue
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -160,6 +165,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      foregroundColor:
+                          Colors.lightBlue, // Set text color to light blue
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -187,10 +194,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (_) => const SignupScreen()),
+                            MaterialPageRoute(
+                                builder: (_) => const SignupScreen()),
                           );
                         },
                         child: const Text('Sign Up'),
+                        style: TextButton.styleFrom(
+                          foregroundColor:
+                              Colors.lightBlue, // Set text color to light blue
+                        ),
                       ),
                     ],
                   ),

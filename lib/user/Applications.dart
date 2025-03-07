@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hatka/user/Notifications_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -262,123 +264,236 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
     }
   }
 
-  Future<void> _submitApplication() async {
-    // Existing auth check
-    User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please log in to submit an application')));
-      return;
+  // Modify your _submitApplication method in _JobApplicationFormState class
+Future<void> _submitApplication() async {
+  // Existing auth check
+  User? currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please log in to submit an application')));
+    return;
+  }
+
+  // Validate form
+  if (!_formKey.currentState!.validate()) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Please fill in all required fields correctly')));
+    return;
+  }
+
+  // Debug information
+  print(
+      "Job instance: ${_jobInstance.id}, postId: ${_jobInstance.postId}, companyId: ${_jobInstance.companyId}");
+
+  // Determine the best ID to use for the post reference
+  // Try postId first, then fall back to id if needed
+  String postId = '';
+  if (_jobInstance.postId.isNotEmpty) {
+    postId = _jobInstance.postId;
+  } else if (_jobInstance.id.isNotEmpty) {
+    postId = _jobInstance.id;
+  }
+
+  if (postId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Invalid job posting. Please try again later.')));
+    return;
+  }
+
+  // Check if resume is uploaded
+  if (_resumeFile == null) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Please upload your resume')));
+    return;
+  }
+
+  setState(() {
+    _isSubmitting = true;
+  });
+
+  try {
+    // Upload resume to Cloudinary
+    String? resumeUrl = await _uploadToCloudinary(_resumeFile!);
+
+    if (resumeUrl == null) {
+      throw Exception('Failed to upload resume');
     }
 
-    // Validate form
-    if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Please fill in all required fields correctly')));
-      return;
-    }
+    // Get post reference from posts collection
+    DocumentReference postRef =
+        FirebaseFirestore.instance.collection('posts').doc(postId);
 
-    // Debug information
-    print(
-        "Job instance: ${_jobInstance.id}, postId: ${_jobInstance.postId}, companyId: ${_jobInstance.companyId}");
+    // Print for debugging
+    print("Submitting application with postId: $postId");
 
-    // Determine the best ID to use for the post reference
-    // Try postId first, then fall back to id if needed
-    String postId = '';
-    if (_jobInstance.postId.isNotEmpty) {
-      postId = _jobInstance.postId;
-    } else if (_jobInstance.id.isNotEmpty) {
-      postId = _jobInstance.id;
-    }
+    // Get company ID and application details
+    String companyId = _jobInstance.companyId;
+    String applicationId = '';
 
-    if (postId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Invalid job posting. Please try again later.')));
-      return;
-    }
-
-    // Check if resume is uploaded
-    if (_resumeFile == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Please upload your resume')));
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
+    // Submit to user's jobApplications subcollection
+    DocumentReference applicationRef = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('jobApplications')
+        .add({
+      'jobTitle': _jobInstance.title,
+      'company': _companyName,
+      'companyImageUrl': _companyProfileImageUrl,
+      'location': _jobLocation,
+      'postId': postId,
+      'applicantId': currentUser.uid,
+      'postRef': postRef,
+      'fullName': _fullNameController.text,
+      'email': _emailController.text,
+      'additionalText': _additionalTextController.text,
+      'resumeUrl': resumeUrl,
+      'submittedAt': FieldValue.serverTimestamp(),
+      'status': 'pending',
     });
 
-    try {
-      // Upload resume to Cloudinary
-      String? resumeUrl = await _uploadToCloudinary(_resumeFile!);
+    applicationId = applicationRef.id;
 
-      if (resumeUrl == null) {
-        throw Exception('Failed to upload resume');
-      }
-
-      // Get post reference from posts collection
-      DocumentReference postRef =
-          FirebaseFirestore.instance.collection('posts').doc(postId);
-
-      // Print for debugging
-      print("Submitting application with postId: $postId");
-
-      // Submit to user's jobApplications subcollection
+    // Add application to company's applications subcollection
+    if (companyId.isNotEmpty) {
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid)
-          .collection('jobApplications')
+          .doc(companyId)
+          .collection('applications')
           .add({
         'jobTitle': _jobInstance.title,
-        'company': _companyName,
-        'companyImageUrl': _companyProfileImageUrl,
         'location': _jobLocation,
         'postId': postId,
-        'applicantId': currentUser.uid,
         'postRef': postRef,
-        'fullName': _fullNameController.text,
-        'email': _emailController.text,
+        'applicantId': currentUser.uid,
+        'applicantName': _fullNameController.text,
+        'applicantEmail': _emailController.text,
         'additionalText': _additionalTextController.text,
         'resumeUrl': resumeUrl,
         'submittedAt': FieldValue.serverTimestamp(),
         'status': 'pending',
       });
 
-      // Add application to company's applications subcollection
-      // if (_jobInstance.companyId.isNotEmpty) {
-      //   await FirebaseFirestore.instance
-      //       .collection('users')
-      //       .doc(_jobInstance.companyId)
-      //       .collection('applications')
-      //       .add({
-      //     'jobTitle': _jobInstance.title,
-      //     'location': _jobLocation,
-      //     'postId': postId,
-      //     'postRef': postRef,
-      //     'applicantId': currentUser.uid,
-      //     'applicantName': _fullNameController.text,
-      //     'applicantEmail': _emailController.text,
-      //     'additionalText': _additionalTextController.text,
-      //     'resumeUrl': resumeUrl,
-      //     'submittedAt': FieldValue.serverTimestamp(),
-      //     'status': 'pending',
-      //   });
-      // }
+      // Get applicant details
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      
+      String applicantName = _fullNameController.text;
+      String? applicantProfileImage = userDoc.data()?['profileImage'];
 
-      // Navigate to success screen
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (context) => ApplicationResultScreen(isSuccess: true)));
-    } catch (e) {
-      print('Error submitting application: $e');
-      // Show error in snackbar
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      // Send notification to company
+      await NotificationService().sendNotificationToUser(
+        userId: companyId,
+        title: 'New Job Application',
+        body: '$applicantName has applied for ${_jobInstance.title}',
+        data: {
+          'type': 'new_application',
+          'postId': postId,
+          'applicationId': applicationId,
+          'applicantId': currentUser.uid,
+          'applicantName': applicantName,
+          'applicantImage': applicantProfileImage,
+          'jobTitle': _jobInstance.title,
+        },
+      );
 
-      setState(() {
-        _isSubmitting = false;
+      // Add notification to company's notifications collection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(companyId)
+          .collection('notifications')
+          .add({
+        'title': 'New Job Application',
+        'body': '$applicantName has applied for ${_jobInstance.title}',
+        'type': 'new_application',
+        'postId': postId,
+        'applicationId': applicationId,
+        'applicantId': currentUser.uid,
+        'applicantName': applicantName,
+        'applicantImage': applicantProfileImage,
+        'jobTitle': _jobInstance.title,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
       });
     }
+
+    // Send confirmation notification to applicant
+    await NotificationService().sendNotificationToUser(
+      userId: currentUser.uid,
+      title: 'Application Submitted',
+      body: 'Your application for ${_jobInstance.title} at $_companyName has been submitted successfully!',
+      data: {
+        'type': 'application_submitted',
+        'postId': postId,
+        'applicationId': applicationId,
+        'jobTitle': _jobInstance.title,
+        'company': _companyName,
+      },
+    );
+
+    // Add notification to user's notifications collection
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('notifications')
+        .add({
+      'title': 'Application Submitted',
+      'body': 'Your application for ${_jobInstance.title} at $_companyName has been submitted successfully!',
+      'type': 'application_submitted',
+      'postId': postId,
+      'applicationId': applicationId,
+      'jobTitle': _jobInstance.title,
+      'company': _companyName,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Show local notification
+    await _showApplicationSubmittedNotification();
+
+    // Navigate to success screen
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (context) => ApplicationResultScreen(isSuccess: true)));
+  } catch (e) {
+    print('Error submitting application: $e');
+    // Show error in snackbar
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+
+    setState(() {
+      _isSubmitting = false;
+    });
   }
+}
+
+Future<void> _showApplicationSubmittedNotification() async {
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'job_application_channel',
+    'Job Applications',
+    channelDescription: 'Notifications for job applications',
+    importance: Importance.max,
+    priority: Priority.high,
+    showWhen: false,
+  );
+  
+  const NotificationDetails platformDetails = NotificationDetails(
+    android: androidDetails,
+    iOS: DarwinNotificationDetails(),
+  );
+  
+  try {
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      'Application Submitted',
+      'Your application for ${_jobInstance.title} has been submitted successfully!',
+      platformDetails,
+    );
+    print('Notification shown successfully');
+  } catch (e) {
+    print('Error showing notification: $e');
+  }
+}
 
   @override
   Widget build(BuildContext context) {
