@@ -40,6 +40,7 @@ class Job {
   }
 }
 
+
 // Job Application Form
 class JobApplicationForm extends StatefulWidget {
   final Map<String, dynamic> job;
@@ -52,6 +53,7 @@ class JobApplicationForm extends StatefulWidget {
 
 class _JobApplicationFormState extends State<JobApplicationForm> {
   final _formKey = GlobalKey<FormState>();
+  
 
   // Controllers for text fields
   final TextEditingController _fullNameController = TextEditingController();
@@ -75,6 +77,7 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
   final String cloudinaryUrl =
       'https://api.cloudinary.com/v1_1/dbo1t0quj/upload';
   final String uploadPreset = 'pdfapplication';
+  final String resourceType = 'raw'; // Use 'raw' for PDF files
 
   late Job _jobInstance;
 
@@ -224,10 +227,17 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
 
   Future<String?> _uploadToCloudinary(File file) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(cloudinaryUrl));
+      // Modify the URL to include resource_type=raw for PDFs
+      final uploadUrl = Uri.parse('$cloudinaryUrl?resource_type=$resourceType');
+      
+      var request = http.MultipartRequest('POST', uploadUrl);
       request.fields['upload_preset'] = uploadPreset;
-      request.fields['folder'] =
-          'resumes'; // Optional: organize uploads in a folder
+      request.fields['folder'] = 'resumes'; // Optional: organize uploads in a folder
+      
+      // Set file type to PDF if it's a PDF file
+      if (file.path.toLowerCase().endsWith('.pdf')) {
+        request.fields['file_type'] = 'pdf';
+      }
 
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
@@ -236,7 +246,8 @@ class _JobApplicationFormState extends State<JobApplicationForm> {
       if (response.statusCode == 200) {
         final responseString = await response.stream.bytesToString();
         final responseData = json.decode(responseString);
-
+        print('Cloudinary upload successful: ${responseData['secure_url']}');
+        
         // Return the secure URL of the uploaded file
         return responseData['secure_url'];
       } else {
@@ -312,7 +323,7 @@ Future<void> _submitApplication() async {
   });
 
   try {
-    // Upload resume to Cloudinary
+    // Upload resume to Cloudinary as a raw file
     String? resumeUrl = await _uploadToCloudinary(_resumeFile!);
 
     if (resumeUrl == null) {

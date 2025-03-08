@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:hatka/company/EditPostScreen.dart';
+import 'package:hatka/company/DetailsJob_screen.dart'; 
 
 class CompanyMainScreen extends StatefulWidget {
   const CompanyMainScreen({super.key});
@@ -84,6 +85,16 @@ class _CompanyMainScreenState extends State<CompanyMainScreen> {
     );
   }
 
+  // Navigate to job detail screen
+  void _navigateToJobDetail(String postId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobDetailScreen(postId: postId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     
@@ -129,178 +140,207 @@ class _CompanyMainScreenState extends State<CompanyMainScreen> {
                         doc.data() as Map<String, dynamic>;
                     String postId = doc.id;
 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Company Logo & Job Title
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.grey[200],
-                                  radius: 24,
-                                  backgroundImage: _profileImage != null
-                                      ? NetworkImage(_profileImage!)
-                                      : null,
-                                  child: _profileImage == null
-                                      ? const Icon(Icons.business)
-                                      : null,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        data["title"] ?? "No title",
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                    return GestureDetector(
+                      onTap: () => _navigateToJobDetail(postId),
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Company Logo & Job Title
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.grey[200],
+                                    radius: 24,
+                                    backgroundImage: _profileImage != null
+                                        ? NetworkImage(_profileImage!)
+                                        : null,
+                                    child: _profileImage == null
+                                        ? const Icon(Icons.business)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          data["title"] ?? "No title",
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                      Text(
-                                        _userName ?? "Your Company",
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey,
+                                        Text(
+                                          _userName ?? "Your Company",
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: data["isActive"] == true
-                                        ? Colors.green[100]
-                                        : Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    data["isActive"] == true
-                                        ? "Active"
-                                        : "Inactive",
-                                    style: TextStyle(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: data["isActive"] == true
-                                          ? Colors.green[800]
-                                          : Colors.red[800],
+                                          ? Colors.green[100]
+                                          : Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      data["isActive"] == true
+                                          ? "Active"
+                                          : "Inactive",
+                                      style: TextStyle(
+                                        color: data["isActive"] == true
+                                            ? Colors.green[800]
+                                            : Colors.red[800],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Location
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on,
+                                      color: Colors.blue, size: 20),
+                                  const SizedBox(width: 5),
+                                  Text(data["location"] ?? "Unknown Location"),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Salary
+                              Row(
+                                children: [
+                                  const Icon(Icons.attach_money,
+                                      color: Colors.green, size: 20),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    "${NumberFormat('#,###').format(data["salary"] ?? 0)}",
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Location
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on,
-                                    color: Colors.blue, size: 20),
-                                const SizedBox(width: 5),
-                                Text(data["location"] ?? "Unknown Location"),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Salary
-                            Row(
-                              children: [
-                                const Icon(Icons.attach_money,
-                                    color: Colors.green, size: 20),
-                                const SizedBox(width: 5),
-                                Text(
-                                  "${NumberFormat('#,###').format(data["salary"] ?? 0)}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Internship & Workspace Type
-                            Row(
-                              children: [
-                                Chip(
-                                  label:
-                                      Text(data["internshipType"] ?? "Unknown"),
-                                  backgroundColor: Colors.blue[100],
-                                ),
-                                const SizedBox(width: 10),
-                                Chip(
-                                  label:
-                                      Text(data["workspaceType"] ?? "Unknown"),
-                                  backgroundColor: Colors.purple[100],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Date Posted
-                            Align(
-                              alignment: Alignment.bottomRight,
-                              child: Text(
-                                data["createdAt"] != null
-                                    ? "Posted on ${DateFormat('dd MMM yyyy').format(data["createdAt"].toDate())}"
-                                    : "Date unknown",
-                                style: const TextStyle(color: Colors.grey),
+                                ],
                               ),
-                            ),
+                              const SizedBox(height: 10),
 
-                            const SizedBox(height: 10),
-
-                            // Edit & Delete Buttons
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.amber,
-                                  ),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            EditPostScreen(postId: postId),
+                              // Updated Internship & Workspace Type chips
+                              Row(
+                                children: [
+                                  // Styled Full-Time chip
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3478F6), // Blue color from the image
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                    child: Text(
+                                      data["internshipType"] ?? "Full-Time",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.edit,
-                                      color: Colors.black87),
-                                  label: const Text(
-                                    "Edit",
-                                    style: TextStyle(color: Colors.black87),
+                                    ),
                                   ),
+                                  const SizedBox(width: 10),
+                                  // Styled On-site chip
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3478F6), // Blue color from the image
+                                      borderRadius: BorderRadius.circular(25),
+                                    ),
+                                    child: Text(
+                                      data["workspaceType"] ?? "On-site",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Date Posted
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: Text(
+                                  data["createdAt"] != null
+                                      ? "Posted on ${DateFormat('dd MMM yyyy').format(data["createdAt"].toDate())}"
+                                      : "Date unknown",
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
-                                const SizedBox(width: 10),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // Edit & Delete Buttons
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.amber,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              EditPostScreen(postId: postId),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.edit,
+                                        color: Colors.black87),
+                                    label: const Text(
+                                      "Edit",
+                                      style: TextStyle(color: Colors.black87),
+                                    ),
                                   ),
-                                  onPressed: () =>
-                                      _showDeleteConfirmation(postId, context),
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.white),
-                                  label: const Text(
-                                    "Delete",
-                                    style: TextStyle(color: Colors.white),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () =>
+                                        _showDeleteConfirmation(postId, context),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.white),
+                                    label: const Text(
+                                      "Delete",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hatka/company/Applicants_screen.dart';
 import 'package:hatka/company/CompanyMain_screen.dart';
 import 'package:hatka/company/Create_screen.dart';
+import 'package:hatka/company/NotificationCompany_screen.dart';
 import 'package:hatka/company/Profile_screen.dart';
 
 class CompanyScreen extends StatefulWidget {
@@ -29,8 +30,8 @@ class _CompanyScreenState extends State<CompanyScreen> {
       children: [
         CompanyMainScreen(),
         CreatePostScreen(),
-        ApplicantScreen(),
-
+        // ApplicantScreen(),
+        NotificationCompanyScreen(),
         ProfileScreen(),
       ],
     );
@@ -52,10 +53,10 @@ class _CompanyScreenState extends State<CompanyScreen> {
       items: [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
         BottomNavigationBarItem(icon: Icon(Icons.create), label: "Create"),
-        BottomNavigationBarItem(
-            icon: Icon(Icons.document_scanner_outlined), label: "Applicants"),
         // BottomNavigationBarItem(
-        //     icon: Icon(Icons.notifications), label: "Notifications"),
+        //     icon: Icon(Icons.document_scanner_outlined), label: "Applicants"),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.notifications), label: "Notifications"),
         BottomNavigationBarItem(icon: Icon(Icons.people), label: "Profile"),
       ],
     );
